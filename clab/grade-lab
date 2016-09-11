@@ -1,0 +1,55 @@
+#!/usr/bin/env python2
+
+from gradelib import *
+
+r = Runner()
+
+def matchtest(parent, name, points, *args, **kw):
+    def do_test():
+        r.match(*args, **kw)
+    test(points, name, parent=parent)(do_test)
+
+@test(0, "basic [part1.c]")
+def test_part1():
+    r.run_test("build/part1")
+matchtest(test_part1, "set_to_five", 5, "part1: set_to_five OK")
+matchtest(test_part1, "array_sum", 5, "part1: array_sum OK")
+
+@test(0, "bubble sort [part2.c]")
+def test_part2():
+    r.run_test("build/part2")
+matchtest(test_part2, "swap", 5, "part2: swap OK")
+matchtest(test_part2, "bubble_sort", 5, "part2: bubble_sort OK")
+
+@test(0, "prime sieves [part3.c]")
+def test_part3():
+    r.run_test("build/part3")
+matchtest(test_part3, "initialize_array", 5, "part3: initialize_array OK")
+matchtest(test_part3, "mark_multiples", 5, "part3: mark_multiples OK")
+matchtest(test_part3, "prime_number_sieves", 5, "part3: prime_number_sieves OK")
+matchtest(test_part3, "find_smallest_divisor", 5, "part3: find_smallest_divisor OK")
+
+
+@test(0, "point structure [part4.c]")
+def test_part4():
+    r.run_test("build/part4")
+matchtest(test_part4, "set_point", 5, "part4: set_point OK")
+matchtest(test_part4, "point_dist", 5, "part4: point_dist OK")
+
+@test(0, "linked list [part5.c]")
+def test_part5():
+    r.run_test("build/part5")
+matchtest(test_part5, "list_insert", 5, "part5: list_insert OK")
+matchtest(test_part5, "list_end", 5, "part5: list_end OK")
+matchtest(test_part5, "list_size", 5, "part5: list_size OK")
+matchtest(test_part5, "list_find", 5, "part5: list_find OK")
+matchtest(test_part5, "list_remove", 5, "part5: list_remove OK")
+
+@test(0, "bitwise operators [part6.c]")
+def test_part6():
+    r.run_test("build/part6")
+matchtest(test_part6, "get_exponent_field", 5, "part6: get_exponent_field OK")
+matchtest(test_part6, "clear_msb", 5, "part6: clear_msb OK")
+matchtest(test_part6, "bit_at_index", 5, "part6: bit_at_index OK")
+
+run_tests()
