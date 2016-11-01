@@ -5,7 +5,7 @@
   
 #include <assert.h>
 
-void
-ex4() {
-	assert(0);
+long ex4(long rdi){
+	if(rdi<=1) return rdi;
+	else return ex4(rdi-1)+ex4(rdi-2);
 }

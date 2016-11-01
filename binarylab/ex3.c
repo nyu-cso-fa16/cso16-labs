@@ -5,7 +5,13 @@
   
 #include <assert.h>
 
-void
-ex3() {
-	assert(0);
+int
+ex3(char* str1, char* str2, int length){
+	int i;
+	for(i=0; i<length; i++){
+		char temp = str1[i];
+		str1[i] = str2[i];
+		str2[i] = temp;
+	}
+	return i;
 }
