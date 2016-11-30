@@ -16,6 +16,7 @@
 #include <float.h>
 #include <time.h>
 #include <getopt.h>
+#include <stdbool.h>
 
 #include "mm.h"
 #include "memlib.h"
@@ -79,6 +80,8 @@ typedef struct {
 
     /* defined only for the student malloc package */
     double util;     /* space utilization for this trace (always 0 for libc) */
+    double thru_ratio; /* throughput compared to libc's */
+    int perfindex;   /* performance index for this trace */
 
     /* Note: secs and util are only defined if valid is true */
 } stats_t; 
@@ -124,7 +127,8 @@ static double eval_mm_util(trace_t *trace, int tracenum, range_t **ranges);
 static void eval_mm_speed(void *ptr);
 
 /* Various helper routines */
-static void printresults(int n, stats_t *stats);
+static void printresults(int n, stats_t *stats, bool perfindex);
+static void calculate_perfindex(int n, const stats_t *libc_stat, stats_t *stat);
 static void usage(void);
 static void unix_error(char *msg);
 static void malloc_error(int tracenum, int opnum, char *msg);
@@ -149,8 +153,7 @@ int main(int argc, char **argv)
     int autograder = 0;  /* If set, emit summary info for autograder (-g) */
 
     /* temporaries used to compute the performance index */
-    double secs, ops, util, avg_mm_util, avg_mm_throughput, p1, p2, perfindex;
-    double libc_secs, libc_ops, avg_libc_throughput;
+    double perfindex;
     int numcorrect;
 
     /* if we are using default traces are not (those do not get malloced) */
@@ -266,7 +269,7 @@ int main(int argc, char **argv)
     /* Display the libc results in a compact table */
     if (verbose) {
 	printf("\nResults for libc malloc:\n");
-	printresults(num_tracefiles, libc_stats);
+	printresults(num_tracefiles, libc_stats, false);
     }
 
     /*
@@ -303,57 +306,31 @@ int main(int argc, char **argv)
 	free_trace(trace);
     }
 
+    calculate_perfindex(num_tracefiles, libc_stats, mm_stats);
     /* Display the mm results in a compact table */
     if (verbose) {
 	printf("\nResults for mm malloc:\n");
-	printresults(num_tracefiles, mm_stats);
+	printresults(num_tracefiles, mm_stats, true);
 	printf("\n");
     }
 
     /* 
-     * Accumulate the aggregate statistics for the student's mm package 
-     */
-    libc_secs = secs = 0;
-    libc_ops =  ops = 0;
-    util = 0;
-    numcorrect = 0;
-    for (i=0; i < num_tracefiles; i++) {
-	secs += mm_stats[i].secs;
-	libc_secs += libc_stats[i].secs;
-	ops += mm_stats[i].ops;
-	libc_ops += libc_stats[i].ops;
-	util += mm_stats[i].util;
-	if (mm_stats[i].valid)
-	    numcorrect++;
-    }
-    avg_mm_util = util/num_tracefiles;
-
-    /* 
      * Compute and print the performance index 
      */
-    if (errors == 0) {
-	avg_mm_throughput = ops/secs;
-	avg_libc_throughput = libc_ops/libc_secs;
-
-	p1 = UTIL_WEIGHT * avg_mm_util;
-	if (avg_mm_throughput > avg_libc_throughput) {
-	    p2 = (double)(1.0 - UTIL_WEIGHT);
-	} 
-	else {
-	    p2 = ((double) (1.0 - UTIL_WEIGHT)) * 
-		(avg_mm_throughput/avg_libc_throughput);
-	}
-	
-	perfindex = (p1 + p2)*100.0;
-	printf("Perf index = %.0f (util) + %.0f (thru) = %.0f/100\n",
-	       p1*100, 
-	       p2*100, 
-	       perfindex);
-	
+    perfindex = 0.0;
+    numcorrect = 0;
+    for (i=0; i < num_tracefiles; i++) {
+	    if (mm_stats[i].valid) {
+		    numcorrect++;
+		    perfindex += mm_stats[i].perfindex;
+	    }
     }
-    else { /* There were errors */
-	perfindex = 0.0;
-	printf("Terminated with %d errors\n", errors);
+    perfindex = perfindex/(double)num_tracefiles;
+    printf("Performance index = %.1f * util + %.1f * (your throughput)/(libc's throughput)\n", UTIL_WEIGHT*100, (1- UTIL_WEIGHT)*100);
+    printf("%d out of %d traces passed, average performance index %.1f (out of 100.0)\n", numcorrect, num_tracefiles, perfindex);
+
+    if (errors != 0) { /* There were errors */
+	    printf("Terminated with %d errors\n", errors);
     }
 
     if (autograder) {
@@ -932,10 +909,38 @@ static void eval_libc_speed(void *ptr)
  ************************************/
 
 
+static void
+calculate_perfindex(int n, const stats_t *libc_stats, stats_t *stats)
+{
+	for (int i = 0; i < n; i++) {
+		if (stats[i].valid) {
+			double avg_mm_throughput = stats[i].ops/stats[i].secs;
+			double avg_libc_throughput = libc_stats[i].ops/libc_stats[i].secs;
+
+			double p1 = UTIL_WEIGHT * stats[i].util;
+			double p2;
+			
+			if (avg_mm_throughput > avg_libc_throughput) {
+			    p2 = (double)(1.0 - UTIL_WEIGHT);
+			} else {
+			    p2 = ((double) (1.0 - UTIL_WEIGHT)) * 
+				(avg_mm_throughput/avg_libc_throughput);
+			}
+			
+			stats[i].perfindex = (int)((p1 + p2)*100.0);
+			stats[i].thru_ratio = avg_mm_throughput/avg_libc_throughput;
+		} else {
+			stats[i].perfindex = 0;
+			stats[i].thru_ratio = 0;
+		}
+
+	}
+}
+
 /*
  * printresults - prints a performance summary for some malloc package
  */
-static void printresults(int n, stats_t *stats) 
+static void printresults(int n, stats_t *stats, bool perfindex)
 {
     int i;
     double secs = 0;
@@ -943,50 +948,47 @@ static void printresults(int n, stats_t *stats)
     double util = 0;
 
     /* Print the individual results for each trace */
-    printf("%5s%7s %5s%8s%10s  %6s\n", 
+    printf("%5s%7s %5s%8s%10s  %6s", 
 	   "trace", " valid", "util", "ops", "secs", "Kops");
+    if (perfindex) {
+    	printf("%10s\n", "PerfIndex");
+    } else {
+	    printf("\n");
+    }
+
     for (i=0; i < n; i++) {
 	if (stats[i].valid) {
-	    printf("%2d%10s%5.0f%%%8.0f%10.6f  %6.0f\n", 
+	    secs += stats[i].secs;
+	    ops += stats[i].ops;
+	    util += stats[i].util;
+	    printf("%2d%10s%5.0f%%%8.0f%10.6f  %6.0f", 
 		   i,
 		   "yes",
 		   stats[i].util*100.0,
 		   stats[i].ops,
 		   stats[i].secs,
 		   (stats[i].ops/1e3)/stats[i].secs);
-	    secs += stats[i].secs;
-	    ops += stats[i].ops;
-	    util += stats[i].util;
+	    if (perfindex) {
+		    printf("%10d\n", stats[i].perfindex);
+	    } else {
+		    printf("\n");
+	    }
 	}
 	else {
-	    printf("%2d%10s%6s%8s%10s  %6s\n", 
+	    printf("%2d%10s%6s%8s%10s  %6s", 
 		   i,
 		   "no",
 		   "-",
 		   "-",
 		   "-",
 		   "-");
+	    if (perfindex) {
+		    printf("%10s\n", "-");
+	    } else {
+		    printf("\n");
+	    }
 	}
     }
-
-    /* Print the aggregate results for the set of traces */
-    if (errors == 0) {
-	printf("%12s%5.0f%%%8.0f%10.6f  %6.0f\n", 
-	       "Total       ",
-	       (util/n)*100.0,
-	       ops, 
-	       secs,
-	       (ops/1e3)/secs);
-    }
-    else {
-	printf("%12s%6s%8s%10s  %6s\n", 
-	       "Total       ",
-	       "-", 
-	       "-", 
-	       "-", 
-	       "-");
-    }
-
 }
 
 /* 
