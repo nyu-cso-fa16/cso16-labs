@@ -5,7 +5,14 @@
   
 #include <assert.h>
 
-void
-ex2() {
-	assert(0);
+int
+ex2(char* array) {
+	int a_count = 0;
+	int index = 0;
+	while(array[index]){
+		if(array[index] == 'a')
+			a_count++;
+		index++;
+	}
+	return a_count;
 }

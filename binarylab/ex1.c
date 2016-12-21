@@ -5,7 +5,7 @@
   
 #include <assert.h>
 
-void
-ex1() {
-	assert(0);
+int
+ex1(long x, long y, long z){//This program checks to see if the sum of two numbers equals a third.
+	return x+y == z;
 }

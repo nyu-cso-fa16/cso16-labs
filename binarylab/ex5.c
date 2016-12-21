@@ -7,7 +7,16 @@
 #include <assert.h>
 #include "ex5.h"
 
-void
-ex5(node **n) {
-	assert(0);
+int
+ex5(node *n) {//This one checks if a linked list's values are sorted in increasing order.
+	if(n){//Checks to make sure that the first node exists.
+		node* next = (*n).next;
+		while(next){//Increment through each node until you reach the last one
+			if((*n).value > (*next).value)//If any of them have a value smaller than the previous one,
+				return 0;//return false.
+			n = next;
+			next = (*next).next;
+		}
+	}
+	return 1;//Otherwise, return true.
 }

@@ -38,6 +38,8 @@ bloom_init(int bsz /* size of bitmap to allocate in bits*/ )
 	f.bsz = bsz;
 
 	/* your code here*/
+	f.buf = (char*)malloc(bsz/8);
+	memset(f.buf, 0, bsz/8);
 	return f;
 }
 
@@ -47,11 +49,21 @@ bloom_init(int bsz /* size of bitmap to allocate in bits*/ )
    To set the 9-th bit of the bitmap to be "1", you should set the left-most
    bit of the second character in the character array to be "1".
 */
+
 void
 bloom_add(bloom_filter f,
 	long long elm /* the element to be added (a RK hash value) */)
 {
-	/* Your code here */
+	int i;
+	for(i=0; i<BLOOM_HASH_NUM; i++){
+		//Use f hash functions
+		int pos = hash_i(i, elm) % f.bsz;
+		//to map v into f positions in the bitmap
+		int byte_pos = pos/8;
+		int bit_pos = pos%8;
+		//and set each position to one.
+		f.buf[byte_pos] = f.buf[byte_pos] | (128 >> (bit_pos-1) ) ;
+	}
 }
 
 /* Query if elm is a probably in the given bloom filter */ 
@@ -59,9 +71,22 @@ int
 bloom_query(bloom_filter f,
 	long long elm /* the query element (a RK hash value) */ )
 {
-
-	/* Your code here */
-	return 0;
+	//Create a bloom filter for the test and fill it.
+	bloom_filter test = bloom_init(f.bsz);
+	bloom_add(test, elm);
+	int i;
+	//For each char in the filters
+	for(i=0; i<f.bsz; i++){
+		//Find the bitwise and of both. If the query element is in the filter, this should be equal to the test filter.
+		char n = test.buf[i]&f.buf[i];
+		//If not,
+		if (n != test.buf[i]){
+			//return 0.
+			return 0;
+		}
+	}
+	//If all the chars match in that way, though, return 1.
+	return 1;
 }
 
 void 
@@ -80,7 +105,8 @@ bloom_print(bloom_filter f,
             int count     /* number of bits to display*/ )
 {
 	assert(count % 8 == 0);
-	for(int i=0; i< (f.bsz>>3) && i < (count>>3); i++) {
+	int i;
+	for(i=0; i< (f.bsz>>3) && i < (count>>3); i++) {
 		printf("%02x ", (unsigned char)(f.buf[i]));
 	}
 	printf("\n");

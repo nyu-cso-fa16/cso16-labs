@@ -114,17 +114,94 @@ normalize(unsigned char *buf,	/* The character array contains the string to be n
 {
     /* your code here */
 
-    return 0;
-
-
+    int whitespace_counter = 0;
+    int i;
+	for(i=0; i<len; i++){//for each character in the string
+		//if that character is uppercase
+		if(isupper(buf[i])){
+			//make it lowercase
+			buf[i] = tolower(buf[i]);
+			//if we have more than one whitespace before it
+			if(whitespace_counter>1){
+				int j;
+				//set each character back by one fewer position than the number of whitespaces.
+				for(j = i; j<len; j++){
+					buf[j-whitespace_counter+1] = buf[j];
+				}
+				//adjust the string length and counter accordingly
+				len = len - whitespace_counter+1;
+				i = i- whitespace_counter + 1;
+			}
+			//reset the whitespace counter
+			whitespace_counter = 0;
+		}
+		//if the character is whitespace
+		else if(isspace(buf[i])){
+			//make it a regular space
+			buf[i] = ' ';
+			//and increment the whitespace counter
+			whitespace_counter = whitespace_counter + 1;
+		//if it's anything else
+		}else{
+			//just check the whitespace counter and act accordingly.
+			if(whitespace_counter>1){
+				int j;
+				for(j = i; j<len; j++){
+					buf[j-whitespace_counter+1] = buf[j];
+				}
+				len = len - whitespace_counter+1;
+				i = i - whitespace_counter + 1;
+			}
+			whitespace_counter = 0;
+		}
+	}
+	//At the end, if the first character is a space,
+	if(buf[0] == ' '){
+		//move the string back by 1.
+		for(i=1; i<len; i++){
+			buf[i-1] = buf[i];
+		}
+		//and adjust the length accordingly.
+		len = len - 1;
+	}
+	//If the last character is a space,
+	while(buf[len-1]== ' '){
+		//remove it.
+		len = len - 1;
+	}
+    return len;
 }
 
 int
 exact_match(const unsigned char *qs, int m, 
         const unsigned char *ts, int n)
 {
-    /* your code here */
-    return 0;
+	//create non-constant versions of the strings
+	char* qs2 = malloc(m);
+	strcpy(qs2, qs);
+	char* ts2 = malloc(n);
+	strcpy(ts2, ts);
+	//normalize both
+    m = normalize(qs2, m);
+    int l;
+    n = normalize(ts2, n);
+    //if not equal in size
+    if(n!=m){
+    	//return false
+    	return 0;
+    //otherwise
+    }else{
+    	int i;
+    	//increment through every character in both strings and compare
+    	for(i=0; i<n; i++){
+    		if(*(ts2+i) != *(qs2+i)){
+    			//if any do not match, return 0.
+    			return 0;
+    		}
+    	}
+    	//If they all do, return 1.
+    	return 1;
+    }
 }
 
 /* check if a query string ps (of length k) appears 
@@ -138,8 +215,16 @@ simple_substr_match(const unsigned char *ps,	/* the query string */
 	const unsigned char *ts,/* the document string (Y) */ 
 	int n/* the length of the document Y */)
 {
-    /* Your code here */
-	return 0;
+	int i;
+	//increment through all n-k+1 substrings.
+	for(i=0; i<n-k+1; i++){
+		//If the current one matches the query string
+		if(!strncmp(ts+i, ps, k))
+			//return true
+			return 1;
+	}
+	//otherwise, if none match, return false.
+	return 0;;
 }
 
 /* initialize the Rabin-karp hash computation by calculating 
@@ -151,7 +236,18 @@ simple_substr_match(const unsigned char *ps,	/* the query string */
 long long
 rkhash_init(const unsigned char *charbuf, int k, long long *h)
 {
-	/* Your code here */
+	int i;
+	//set the hash to start at 0, and the h-value to 1.
+	long long hash = 0;
+	*h = 1;
+	//for each of the k characters,
+	for(i=0; i<k; i++){
+		//multiply the h-value by 256, eventually getting it to 256^k
+		*h = mmul(*h, 256);
+		//and multiply the hash value by 256, before adding the next character.
+		hash = madd(mmul(hash, 256), charbuf[i]);
+	}
+	return hash;
 }
 
 
@@ -164,7 +260,8 @@ rkhash_init(const unsigned char *charbuf, int k, long long *h)
 long long 
 rkhash_next(long long curr_hash, long long h, unsigned char prev, unsigned char next)
 {
-	/* Your code here */
+	//This is simply the modulo math version of the above expression.
+	return madd(mdel(mmul(curr_hash, 256), mmul(prev, h)), next);
 }
 
 /* Check if a query string ps (of length k) appears 
@@ -184,14 +281,38 @@ rkhash_next(long long curr_hash, long long h, unsigned char prev, unsigned char 
 	 0 chunks matched (out of 2), percentage: 0.00 
    Hint: Use printf("%lld", x) to print a long long type.
    */
+
 int
 rabin_karp_match(const unsigned char *ps,	/* the query string */
 	int k,/* the length of the query string */
 	const unsigned char *ts,/* the document string (Y) */ 
 	int n/* the length of the document Y */ )
 {
-	
-    /* Your code here */
+	long long* h = (long long*)malloc(sizeof(long long));
+	long long query_hash = rkhash_init(ps, k, h);
+	printf("%lld\n", query_hash);
+	long long test_hash = rkhash_init(ts, k, h);
+	//Store the test hash for the printing in a temporary long long variable.
+	long long temp = test_hash;
+	int i;
+	//Print the first few hashes
+	for(i=0; i<PRINT_RK_HASH; i++){
+		printf("%lld ", temp);
+		temp = rkhash_next(temp, *h, ts[i], ts[i+k]);
+	}
+	printf("\n");
+	//For each of the document substrings
+	for(i=0; i<n-k; i++){
+		//if the query hash matches the test hash,
+		if(query_hash == test_hash)
+			//check that the strings match,
+			if(!strncmp(ts+i, ps, k))
+				//and if so, return true.
+				return 1;
+		//otherwise, calculate the next hash.
+		test_hash = rkhash_next(test_hash, *h, ts[i], ts[i+k]);
+	}
+	//If no matches were found, return false.
 	return 0;
 }
 
@@ -213,9 +334,30 @@ rabin_karp_batchmatch(int bsz, /* size of bitmap (in bits) to be used */
     const unsigned char *ts, /* to-be-matched document (Y) */
     int n /* to-be-matched document length*/)
 {
-
-    /* Your code here */
-    return 0;
+	bloom_filter qsf = bloom_init(bsz);
+	long long* h = (long long*)malloc(sizeof(long long));
+	int i;
+	int matches = 0;
+	//Add each of the m/k chunks to the filter.
+	for(i=0; i < m/k; i++){
+		bloom_add(qsf, rkhash_init(qs+(i*k), k, h));
+	}
+	bloom_print(qsf, PRINT_BLOOM_BITS);
+	//Create the first hash of the document.
+	long long test_hash = rkhash_init(ts, k, h);
+	for(i=0; i < n-k; i++){
+		//Check if the hash is in the filter.
+		if(bloom_query(qsf, test_hash)){
+			//If so, then compare the strings.
+			int j;
+			for(j=0; j < m/k; j++)
+				//Increment the number of matches if there's a match.
+				if(!strncmp(ts+i, qs+(j*k), k))
+					matches++;
+		}
+		//Move on to the next hash.
+		test_hash = rkhash_next(test_hash, *h, ts[i], ts[i+k]);
+	}
+	//Return the number of matches.
+	return matches;
 }
-
-
